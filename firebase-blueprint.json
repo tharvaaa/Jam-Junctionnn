@@ -1,0 +1,71 @@
+{
+  "entities": {
+    "booking": {
+      "title": "Booking",
+      "description": "A studio booking session in Jam Junction",
+      "type": "object",
+      "properties": {
+        "clientName": { "type": "string", "description": "Client or band name", "maxLength": 150 },
+        "date": { "type": "string", "description": "Booking date in YYYY-MM-DD format", "maxLength": 30 },
+        "timeSlot": { "type": "string", "description": "Time slot string", "maxLength": 60 },
+        "type": { "type": "string", "description": "Booking session type", "enum": ["Jam", "Karaoke", "Recording"] },
+        "defaultRate": { "type": "number", "description": "Default hourly rate" },
+        "overrideRate": { "type": "number", "description": "Overridden hourly rate" },
+        "finalRate": { "type": "number", "description": "Final rate per hour" },
+        "hours": { "type": "number", "description": "Duration in hours" },
+        "totalAmount": { "type": "number", "description": "Total amount" },
+        "status": { "type": "string", "description": "Booking status", "enum": ["Up Next", "Live Now", "Completed", "Cancelled"] },
+        "equipment": { "type": "array", "description": "List of selected equipment" },
+        "customRequests": { "type": "string", "description": "Client requests or gear notes", "maxLength": 1000 },
+        "reminderSent": { "type": "boolean", "description": "Whether reminder was sent" },
+        "createdAt": { "type": "string", "description": "Creation timestamp", "maxLength": 50 },
+        "createdBy": { "type": "string", "description": "Admin UID who created the booking", "maxLength": 128 }
+      },
+      "required": ["clientName", "date", "timeSlot", "type", "finalRate", "hours", "totalAmount", "status", "createdAt"]
+    },
+    "studioNote": {
+      "title": "StudioNote",
+      "description": "Studio scratchpad note or memo",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Note title", "maxLength": 200 },
+        "content": { "type": "string", "description": "Note body content", "maxLength": 5000 },
+        "category": { "type": "string", "description": "Note category", "enum": ["maintenance", "modification", "general", "urgent"] },
+        "updatedAt": { "type": "string", "description": "Last updated timestamp", "maxLength": 50 },
+        "createdAt": { "type": "string", "description": "Created timestamp", "maxLength": 50 },
+        "createdBy": { "type": "string", "description": "Admin UID who wrote the note", "maxLength": 128 }
+      },
+      "required": ["title", "content", "category", "updatedAt"]
+    },
+    "emailDispatch": {
+      "title": "EmailDispatch",
+      "description": "Email trigger and dispatch alert record",
+      "type": "object",
+      "properties": {
+        "to": { "type": "string", "description": "Recipient email", "maxLength": 200 },
+        "adminAlertTo": { "type": "string", "description": "Admin recipient email", "maxLength": 200 },
+        "subject": { "type": "string", "description": "Email subject", "maxLength": 300 },
+        "body": { "type": "string", "description": "Email text content", "maxLength": 5000 },
+        "bookingId": { "type": "string", "description": "Associated booking document ID", "maxLength": 128 },
+        "clientName": { "type": "string", "description": "Client name", "maxLength": 150 },
+        "status": { "type": "string", "description": "Dispatch delivery status", "enum": ["sent", "pending", "failed"] },
+        "createdAt": { "type": "string", "description": "Creation timestamp", "maxLength": 50 }
+      },
+      "required": ["to", "subject", "body", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/bookings/{bookingId}": {
+      "schema": "booking",
+      "description": "Studio booking sessions recorded by the admin"
+    },
+    "/studio_notes/{noteId}": {
+      "schema": "studioNote",
+      "description": "Studio scratchpad notes and tasks"
+    },
+    "/mail/{mailId}": {
+      "schema": "emailDispatch",
+      "description": "Email triggers and dispatch alert logs for Firebase trigger extensions and audit tracking"
+    }
+  }
+}

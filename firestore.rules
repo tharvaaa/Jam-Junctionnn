@@ -1,0 +1,81 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidBooking(data) {
+      return data.keys().hasAll(['clientName', 'date', 'timeSlot', 'type', 'finalRate', 'hours', 'totalAmount', 'status', 'createdAt']) &&
+        data.clientName is string && data.clientName.size() > 0 && data.clientName.size() <= 150 &&
+        data.date is string && data.date.size() > 0 && data.date.size() <= 30 &&
+        data.timeSlot is string && data.timeSlot.size() > 0 && data.timeSlot.size() <= 60 &&
+        data.type in ['Jam', 'Karaoke', 'Recording'] &&
+        data.finalRate is number && data.finalRate >= 0 &&
+        data.hours is number && data.hours > 0 &&
+        data.totalAmount is number && data.totalAmount >= 0 &&
+        data.status in ['Up Next', 'Live Now', 'Completed', 'Cancelled'] &&
+        data.createdAt is string && data.createdAt.size() <= 50;
+    }
+
+    function isValidStudioNote(data) {
+      return data.keys().hasAll(['title', 'content', 'category', 'updatedAt']) &&
+        data.title is string && data.title.size() > 0 && data.title.size() <= 200 &&
+        data.content is string && data.content.size() <= 5000 &&
+        data.category in ['maintenance', 'modification', 'general', 'urgent'] &&
+        data.updatedAt is string && data.updatedAt.size() <= 50;
+    }
+
+    function isValidMail(data) {
+      return data.keys().hasAll(['to', 'subject', 'body', 'status', 'createdAt']) &&
+        data.to is string && data.to.size() > 0 && data.to.size() <= 200 &&
+        data.subject is string && data.subject.size() > 0 && data.subject.size() <= 300 &&
+        data.body is string && data.body.size() > 0 && data.body.size() <= 5000 &&
+        data.status in ['sent', 'pending', 'failed'] &&
+        data.createdAt is string && data.createdAt.size() <= 50;
+    }
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Connection testing doc
+    match /test/{docId} {
+      allow read: if true;
+    }
+
+    // Bookings collection: open access without login portal
+    match /bookings/{bookingId} {
+      allow read: if true;
+      allow create: if isValidId(bookingId) && isValidBooking(incoming());
+      allow update: if isValidId(bookingId) && isValidBooking(incoming());
+      allow delete: if isValidId(bookingId);
+    }
+
+    // Studio notes collection: open access without login portal
+    match /studio_notes/{noteId} {
+      allow read: if true;
+      allow create: if isValidId(noteId) && isValidStudioNote(incoming());
+      allow update: if isValidId(noteId) && isValidStudioNote(incoming());
+      allow delete: if isValidId(noteId);
+    }
+
+    // Mail / Email dispatch alerts collection: open access without login portal
+    match /mail/{mailId} {
+      allow read: if true;
+      allow create: if isValidId(mailId) && isValidMail(incoming());
+      allow update: if isValidId(mailId) && isValidMail(incoming());
+      allow delete: if isValidId(mailId);
+    }
+  }
+}

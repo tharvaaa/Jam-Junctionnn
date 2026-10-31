@@ -1,0 +1,6 @@
+{
+  "name": "The Jam Junction Owner Dashboard",
+  "description": "A premium, high-fidelity owner dashboard for managing jam rooms, recording sessions, bookings, revenue analytics, maintenance logs, and sending automated confirmations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
