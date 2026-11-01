@@ -12,6 +12,7 @@ import DailySchedule from "./components/DailySchedule";
 import RevenueAnalytics from "./components/RevenueAnalytics";
 import StudioNotes from "./components/StudioNotes";
 import LogTimeline from "./components/LogTimeline";
+import LoginPage from "./components/LoginPage";
 import { 
   db, 
   testConnection, 
@@ -28,7 +29,7 @@ import {
 
 import { 
   Calendar, Sliders, DollarSign, BookOpen, 
-  Mail, ShieldCheck, Clock
+  Mail, ShieldCheck, Clock, Lock, LogOut
 } from "lucide-react";
 
 export default function App() {
@@ -44,6 +45,20 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<"entry" | "schedule" | "revenue" | "timeline" | "notes">("entry");
   
   const [currentTime, setCurrentTime] = useState<string>("");
+
+  // Authenticator state (Guarded with username: "The Jam Junction", password: "Nokia@12345")
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return (
+      localStorage.getItem("jam_junction_auth") === "true" ||
+      sessionStorage.getItem("jam_junction_auth") === "true"
+    );
+  });
+
+  const handleLogout = () => {
+    localStorage.removeItem("jam_junction_auth");
+    sessionStorage.removeItem("jam_junction_auth");
+    setIsAuthenticated(false);
+  };
 
   // Toast notification feedback
   const [activeToast, setActiveToast] = useState<{ id: string; message: string; type: "success" | "info" } | null>(null);
@@ -333,6 +348,18 @@ export default function App() {
     }, 4500);
   };
 
+  // Guard entire application behind Authenticator Gate
+  if (!isAuthenticated) {
+    return (
+      <LoginPage 
+        onLogin={() => {
+          setIsAuthenticated(true);
+          showToast("Authenticated successfully. Welcome to JAM JUNCTION.", "success");
+        }} 
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen text-[#F5F5F7] bg-[#0A0A0A] relative overflow-x-hidden font-sans selection:bg-purple-500/30 selection:text-white pb-32">
       
@@ -364,8 +391,8 @@ export default function App() {
             </h1>
           </div>
 
-          {/* Right Live Clock & Dispatch shortcut */}
-          <div className="flex items-center gap-2.5 justify-center md:justify-end text-xs font-mono w-full md:w-48 shrink-0">
+          {/* Right Live Clock, Dispatch shortcut & Lock Console */}
+          <div className="flex items-center gap-2 justify-center md:justify-end text-xs font-mono w-full md:w-auto shrink-0">
             <div className="bg-[#121212]/80 border border-white/10 py-1.5 px-3 rounded-xl flex items-center gap-2 text-left">
               <Clock className="h-3.5 w-3.5 text-purple-400" />
               <span className="text-white font-mono text-xs font-bold">{currentTime || "Live"}</span>
@@ -385,6 +412,15 @@ export default function App() {
               <span className="text-[10px] bg-purple-500/20 px-1.5 py-0.2 rounded-full font-mono">
                 {emailLogs.length}
               </span>
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className="bg-[#1C1C24]/90 hover:bg-red-950/40 border border-white/10 hover:border-red-500/40 text-gray-300 hover:text-red-300 px-3 py-1.5 rounded-xl flex items-center gap-1.5 cursor-pointer font-bold transition-all duration-300"
+              title="Lock studio console / Sign out"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Lock</span>
             </button>
           </div>
 
