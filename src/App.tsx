@@ -1,7 +1,5 @@
-/**
- * @license
- * SPDX-License-Identifier: Apache-2.0
- */
+import { db } from './firebase';
+import { collection, addDoc, getDocs } from 'firebase/firestore';
 
 import { useState, useEffect } from "react";
 import { Booking, StudioNote, EmailLog, BookingStatus } from "./types";
