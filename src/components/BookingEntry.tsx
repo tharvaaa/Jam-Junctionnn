@@ -7,7 +7,7 @@ import { useState, FormEvent } from "react";
 import { Booking, BookingType, EmailLog } from "../types";
 import { 
   Plus, Music, Calendar, DollarSign, 
-  Check, Mic2, FileAudio, Minus, Zap, ArrowRight, Clock
+  Check, Mic2, FileAudio, Minus, Zap, ArrowRight, Clock, Phone
 } from "lucide-react";
 
 interface BookingEntryProps {
@@ -20,6 +20,7 @@ interface BookingEntryProps {
 export default function BookingEntry({ onAddBooking, onSendEmailLog, userEmail, onNavigateTab }: BookingEntryProps) {
   // Booking Form State
   const [clientName, setClientName] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [date, setDate] = useState(() => {
     // Default to today's local ISO date
     const now = new Date();
@@ -39,7 +40,7 @@ export default function BookingEntry({ onAddBooking, onSendEmailLog, userEmail, 
   // Submission feedback states
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
-  const [lastLoggedBooking, setLastLoggedBooking] = useState<{ id: string; name: string; amount: number; hours: number; date: string } | null>(null);
+  const [lastLoggedBooking, setLastLoggedBooking] = useState<{ id: string; name: string; amount: number; hours: number; date: string; phone?: string } | null>(null);
 
   const finalRate = hourlyRate;
   const totalAmount = Math.round(finalRate * hours);
@@ -69,11 +70,13 @@ export default function BookingEntry({ onAddBooking, onSendEmailLog, userEmail, 
 
     setTimeout(() => {
       const trimmedName = clientName.trim();
+      const trimmedPhone = phoneNumber.trim();
       const bookingId = "b_" + Date.now() + "_" + Math.random().toString(36).substring(2, 8);
       
       const newBooking: Booking = {
         id: bookingId,
         clientName: trimmedName,
+        phoneNumber: trimmedPhone || undefined,
         date,
         timeSlot: `${hours}h Session`, // flexible duration-based slot
         type: sessionType,
@@ -98,7 +101,7 @@ export default function BookingEntry({ onAddBooking, onSendEmailLog, userEmail, 
         recipient: clientEmail,
         clientName: trimmedName,
         subject: `🎸 ${trimmedName} — Booking Locked (${sessionType}, ${hours} hrs @ ₹${finalRate}/hr)`,
-        body: `Hi ${trimmedName},\n\nYour session has been successfully reserved and locked into JAM JUNCTION Studio Schedule!\n\nClient / Band Name: ${trimmedName}\n📅 Date: ${date}\n⏱️ Duration: ${hours} Hour${hours !== 1 ? "s" : ""}\n🎸 Session Specifics: ${sessionType} Session (${hours} Hrs @ ₹${finalRate}/hr)\n🎧 Total Bill: ₹${totalAmount}\n📝 Special Requests: ${customRequests.trim() || "None"}\n\n[DISPATCH ALERT: Copy delivered to supervisor ${userEmail}]\n\nKeep on Rocking!`,
+        body: `Hi ${trimmedName},\n\nYour session has been successfully reserved and locked into JAM JUNCTION Studio Schedule!\n\nClient / Band Name: ${trimmedName}\n${trimmedPhone ? `📞 Phone Number: ${trimmedPhone}\n` : ""}📅 Date: ${date}\n⏱️ Duration: ${hours} Hour${hours !== 1 ? "s" : ""}\n🎸 Session Specifics: ${sessionType} Session (${hours} Hrs @ ₹${finalRate}/hr)\n🎧 Total Bill: ₹${totalAmount}\n📝 Special Requests: ${customRequests.trim() || "None"}\n\n[DISPATCH ALERT: Copy delivered to supervisor ${userEmail}]\n\nKeep on Rocking!`,
         type: "confirmation",
         timestamp: new Date().toISOString(),
         status: "sent",
@@ -115,11 +118,13 @@ export default function BookingEntry({ onAddBooking, onSendEmailLog, userEmail, 
         name: trimmedName, 
         amount: totalAmount, 
         hours,
-        date 
+        date,
+        phone: trimmedPhone || undefined
       });
 
-      // Reset client name and requests, keep date for rapid entry
+      // Reset client name, phone and requests, keep date for rapid entry
       setClientName("");
+      setPhoneNumber("");
       setCustomRequests("");
 
       setTimeout(() => {
@@ -173,6 +178,27 @@ export default function BookingEntry({ onAddBooking, onSendEmailLog, userEmail, 
               onChange={(e) => setClientName(e.target.value)}
               className="w-full px-4 py-3 rounded-xl text-sm text-white border input-interactive placeholder-gray-600 focus:outline-none"
             />
+          </div>
+
+          {/* 2. PHONE NUMBER SECTION */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-bold text-gray-300 uppercase tracking-widest font-mono flex items-center gap-1.5">
+                <Phone className="h-3.5 w-3.5 text-purple-400" />
+                <span>Phone Number</span>
+              </label>
+              <span className="text-[10px] text-gray-400 font-mono">Contact / WhatsApp alerts</span>
+            </div>
+            <div className="relative">
+              <Phone className="absolute left-3.5 top-3.5 h-4 w-4 text-purple-400 pointer-events-none" />
+              <input
+                type="tel"
+                placeholder="e.g. +91 98765 43210 or 9876543210"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 rounded-xl text-sm text-white border input-interactive placeholder-gray-600 focus:outline-none font-mono"
+              />
+            </div>
           </div>
 
           {/* 2. CALENDAR DATE TAB */}
@@ -350,9 +376,8 @@ export default function BookingEntry({ onAddBooking, onSendEmailLog, userEmail, 
 
           {/* 5. SPECIAL REQUESTS */}
           <div>
-            <label className="block text-xs font-bold text-gray-300 uppercase tracking-widest mb-1.5 font-mono flex justify-between items-center">
-              <span>Special Requests / Gear Notes</span>
-              <span className="text-[10px] text-gray-500 lowercase">(optional)</span>
+            <label className="block text-xs font-bold text-gray-300 uppercase tracking-widest mb-1.5 font-mono">
+              Special Requests / Gear Notes
             </label>
             <textarea
               placeholder="e.g. Extra mic stand, setup drum riser, key card access, vocal monitor mix..."
@@ -413,7 +438,7 @@ export default function BookingEntry({ onAddBooking, onSendEmailLog, userEmail, 
                   <span className="text-purple-300 underline font-black">{lastLoggedBooking.name}</span>
                 </p>
                 <p className="text-[11px] text-emerald-300/90 font-mono mt-0.5">
-                  📅 {lastLoggedBooking.date} • {lastLoggedBooking.hours} hours • ₹{lastLoggedBooking.amount.toLocaleString()} billed • Logged to schedule & timeline.
+                  📅 {lastLoggedBooking.date} • {lastLoggedBooking.hours} hours • ₹{lastLoggedBooking.amount.toLocaleString()} billed {lastLoggedBooking.phone ? `• 📞 ${lastLoggedBooking.phone} ` : ""}• Logged to schedule & timeline.
                 </p>
               </div>
             </div>

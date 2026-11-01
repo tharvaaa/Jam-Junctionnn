@@ -17,6 +17,8 @@ service cloud.firestore {
     function isValidBooking(data) {
       return data.keys().hasAll(['clientName', 'date', 'timeSlot', 'type', 'finalRate', 'hours', 'totalAmount', 'status', 'createdAt']) &&
         data.clientName is string && data.clientName.size() > 0 && data.clientName.size() <= 150 &&
+        (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() <= 30)) &&
+        (!('startedAt' in data) || (data.startedAt is string && data.startedAt.size() <= 50)) &&
         data.date is string && data.date.size() > 0 && data.date.size() <= 30 &&
         data.timeSlot is string && data.timeSlot.size() > 0 && data.timeSlot.size() <= 60 &&
         data.type in ['Jam', 'Karaoke', 'Recording'] &&
@@ -38,6 +40,7 @@ service cloud.firestore {
     function isValidMail(data) {
       return data.keys().hasAll(['to', 'subject', 'body', 'status', 'createdAt']) &&
         data.to is string && data.to.size() > 0 && data.to.size() <= 200 &&
+        (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() <= 30)) &&
         data.subject is string && data.subject.size() > 0 && data.subject.size() <= 300 &&
         data.body is string && data.body.size() > 0 && data.body.size() <= 5000 &&
         data.status in ['sent', 'pending', 'failed'] &&

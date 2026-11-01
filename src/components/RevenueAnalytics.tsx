@@ -237,6 +237,7 @@ ${index + 1}. ${b.clientName} [${b.type}]
    • Duration: ${b.hours} hrs @ ₹${b.finalRate}/hr
    • Total Amount: ₹${b.totalAmount}
    • Status: ${b.status}
+   • Contact: ${b.phoneNumber || "None provided"}
    • Requests: ${b.customRequests || "None"}
 `;
     });

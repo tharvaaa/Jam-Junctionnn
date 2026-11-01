@@ -9,6 +9,7 @@ export type BookingStatus = "Up Next" | "Live Now" | "Completed" | "Cancelled";
 export interface Booking {
   id: string;
   clientName: string;
+  phoneNumber?: string;
   date: string; // YYYY-MM-DD
   timeSlot: string; // e.g., "10:00 - 11:00"
   type: BookingType;
@@ -22,6 +23,7 @@ export interface Booking {
   customRequests: string;
   reminderSent: boolean;
   createdAt: string;
+  startedAt?: string;
 }
 
 export interface StudioNote {
@@ -41,6 +43,7 @@ export interface EmailLog {
   timestamp: string;
   status: "sent" | "failed";
   clientName?: string;
+  phoneNumber?: string;
   bookingId?: string;
   hours?: number;
   totalAmount?: number;

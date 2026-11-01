@@ -6,6 +6,7 @@
       "type": "object",
       "properties": {
         "clientName": { "type": "string", "description": "Client or band name", "maxLength": 150 },
+        "phoneNumber": { "type": "string", "description": "Client phone number for call and WhatsApp booking updates", "maxLength": 30 },
         "date": { "type": "string", "description": "Booking date in YYYY-MM-DD format", "maxLength": 30 },
         "timeSlot": { "type": "string", "description": "Time slot string", "maxLength": 60 },
         "type": { "type": "string", "description": "Booking session type", "enum": ["Jam", "Karaoke", "Recording"] },
@@ -18,6 +19,7 @@
         "equipment": { "type": "array", "description": "List of selected equipment" },
         "customRequests": { "type": "string", "description": "Client requests or gear notes", "maxLength": 1000 },
         "reminderSent": { "type": "boolean", "description": "Whether reminder was sent" },
+        "startedAt": { "type": "string", "description": "Timestamp when session transitioned to Live Now", "maxLength": 50 },
         "createdAt": { "type": "string", "description": "Creation timestamp", "maxLength": 50 },
         "createdBy": { "type": "string", "description": "Admin UID who created the booking", "maxLength": 128 }
       },
@@ -44,6 +46,7 @@
       "properties": {
         "to": { "type": "string", "description": "Recipient email", "maxLength": 200 },
         "adminAlertTo": { "type": "string", "description": "Admin recipient email", "maxLength": 200 },
+        "phoneNumber": { "type": "string", "description": "Client mobile phone number", "maxLength": 30 },
         "subject": { "type": "string", "description": "Email subject", "maxLength": 300 },
         "body": { "type": "string", "description": "Email text content", "maxLength": 5000 },
         "bookingId": { "type": "string", "description": "Associated booking document ID", "maxLength": 128 },

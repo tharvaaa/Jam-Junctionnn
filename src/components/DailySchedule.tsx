@@ -8,17 +8,25 @@ import { Booking, BookingStatus, BookingType } from "../types";
 import { 
   Calendar, Search, Trash2, Check,
   Music, AlertCircle, Clock, Mic2, FileAudio, Filter,
-  Sparkles, Layers
+  Sparkles, Layers, Phone, Radio
 } from "lucide-react";
+import LiveCountdown from "./LiveCountdown";
 
 interface DailyScheduleProps {
   bookings: Booking[];
-  onUpdateBookingStatus: (id: string, newStatus: BookingStatus) => void;
+  onUpdateBookingStatus: (id: string, newStatus: BookingStatus, updates?: Partial<Booking>) => void;
+  onUpdateBooking?: (id: string, updates: Partial<Booking>) => void;
   onDeleteBooking: (id: string) => void;
   onClearAllBookings?: () => void;
 }
 
-export default function DailySchedule({ bookings, onUpdateBookingStatus, onDeleteBooking, onClearAllBookings }: DailyScheduleProps) {
+export default function DailySchedule({ 
+  bookings, 
+  onUpdateBookingStatus, 
+  onUpdateBooking, 
+  onDeleteBooking, 
+  onClearAllBookings 
+}: DailyScheduleProps) {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   // Today's real local ISO date string
   const todayDateStr = useMemo(() => {
@@ -59,6 +67,7 @@ export default function DailySchedule({ bookings, onUpdateBookingStatus, onDelet
     const matchesDate = selectedDate === "all" || b.date === selectedDate;
     const matchesSearch = 
       b.clientName.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      (b.phoneNumber && b.phoneNumber.toLowerCase().includes(searchQuery.toLowerCase())) ||
       (b.equipment && b.equipment.some(e => e.toLowerCase().includes(searchQuery.toLowerCase()))) ||
       (b.customRequests && b.customRequests.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesType = selectedTypeFilter === "All" || b.type === selectedTypeFilter;
@@ -112,6 +121,8 @@ export default function DailySchedule({ bookings, onUpdateBookingStatus, onDelet
       return false;
     }
   };
+
+  const ongoingBookings = bookings.filter((b) => b.status === "Live Now");
 
   return (
     <div className="space-y-6 relative z-10 p-1 md:p-3">
@@ -221,7 +232,7 @@ export default function DailySchedule({ bookings, onUpdateBookingStatus, onDelet
             <Search className="absolute left-3 top-3 h-4 w-4 text-gray-500" />
             <input
               type="text"
-              placeholder="Search by client/band name, requests, gear..."
+              placeholder="Search by client/band name, phone, requests..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-4 py-2.5 rounded-xl text-xs text-white border input-interactive placeholder-gray-600 focus:outline-none pointer-events-auto"
@@ -252,6 +263,52 @@ export default function DailySchedule({ bookings, onUpdateBookingStatus, onDelet
         </div>
       </div>
 
+      {/* ONGOING LIVE SESSIONS SECTION (WITH LIVE COUNTDOWN OF TIME LEFT) */}
+      {ongoingBookings.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-rose-500"></span>
+            </span>
+            <h3 className="text-xs font-black tracking-widest uppercase text-rose-400 font-mono flex items-center gap-1.5">
+              <Radio className="h-3.5 w-3.5 text-rose-400 animate-pulse" />
+              <span>Ongoing Live Sessions ({ongoingBookings.length}) — Live Countdown</span>
+            </h3>
+          </div>
+
+          <div className="space-y-3">
+            {ongoingBookings.map((b) => (
+              <div key={`live-active-${b.id}`} className="glass-panel rounded-2xl p-5 border border-rose-500/40 bg-rose-950/20">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3 pb-3 border-b border-rose-500/20">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-mono font-bold bg-rose-500/20 text-rose-300 px-2.5 py-0.5 rounded border border-rose-500/30 uppercase">
+                      {b.type} Session
+                    </span>
+                    <h4 className="text-lg font-black text-white uppercase tracking-tight">{b.clientName}</h4>
+                  </div>
+                  {b.phoneNumber && (
+                    <a
+                      href={`tel:${b.phoneNumber}`}
+                      className="text-xs font-mono font-bold text-emerald-300 hover:text-emerald-200 flex items-center gap-1.5 bg-black/50 px-3 py-1.5 rounded-xl border border-emerald-500/40"
+                    >
+                      <Phone className="h-3.5 w-3.5 text-emerald-400" />
+                      <span>{b.phoneNumber}</span>
+                    </a>
+                  )}
+                </div>
+
+                <LiveCountdown 
+                  booking={b} 
+                  onUpdateBookingStatus={onUpdateBookingStatus} 
+                  onUpdateBooking={onUpdateBooking} 
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* TIMELINE LIST */}
       <div>
         <div className="flex items-center justify-between mb-4">
@@ -275,17 +332,22 @@ export default function DailySchedule({ bookings, onUpdateBookingStatus, onDelet
           <div className="space-y-4">
             {sortedBookings.map((booking) => {
               const justLocked = isJustLocked(booking.createdAt);
+              const isLive = booking.status === "Live Now";
 
               return (
                 <div
                   key={booking.id}
                   id={`booking-card-${booking.id}`}
                   className={`glass-panel rounded-2xl p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-5 border pointer-events-auto transition-all duration-300 hover:-translate-y-1 hover:border-purple-500/40 hover:shadow-xl hover:shadow-purple-500/15 ${
-                    justLocked ? "border-purple-500/60 bg-purple-950/20 shadow-lg shadow-purple-500/10" : "border-white/5"
+                    isLive 
+                      ? "border-rose-500/60 bg-rose-950/20 shadow-xl shadow-rose-500/15" 
+                      : justLocked 
+                      ? "border-purple-500/60 bg-purple-950/20 shadow-lg shadow-purple-500/10" 
+                      : "border-white/5"
                   }`}
                 >
                   {/* Main Session Identity info */}
-                  <div className="space-y-3 flex-1">
+                  <div className="space-y-3 flex-1 w-full">
                     
                     {/* Top Tag Badges Row */}
                     <div className="flex flex-wrap items-center gap-2">
@@ -313,21 +375,51 @@ export default function DailySchedule({ bookings, onUpdateBookingStatus, onDelet
                         )}
                       </span>
 
+                      {/* CLIENT MOBILE NUMBER BADGE */}
+                      {booking.phoneNumber ? (
+                        <a
+                          href={`tel:${booking.phoneNumber}`}
+                          className="text-xs font-mono font-bold text-emerald-300 hover:text-emerald-200 flex items-center gap-1.5 bg-emerald-950/40 hover:bg-emerald-900/60 px-2.5 py-1 rounded-md border border-emerald-500/40 transition-colors"
+                          title="Click to dial client"
+                        >
+                          <Phone className="h-3.5 w-3.5 text-emerald-400" />
+                          <span>{booking.phoneNumber}</span>
+                        </a>
+                      ) : (
+                        <span className="text-[11px] font-mono text-gray-500 bg-black/30 px-2 py-0.5 rounded">
+                          No phone
+                        </span>
+                      )}
+
                       <span className={`text-[10px] uppercase tracking-widest font-bold py-0.5 px-2.5 border rounded-full ${getStatusColor(booking.status)}`}>
                         {booking.status}
                       </span>
                     </div>
 
-                    {/* PROMINENT CLIENT / BAND NAME */}
+                    {/* PROMINENT CLIENT / BAND NAME & PHONE */}
                     <div className="space-y-1">
                       <div className="flex items-center gap-2.5 flex-wrap">
                         <span className="text-[10px] uppercase tracking-widest font-mono font-black px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
                           BAND / CLIENT
                         </span>
-                        <h4 className="text-xl md:text-2xl font-black text-white tracking-tight">
+                        <h4 className="text-xl md:text-2xl font-black text-white tracking-tight uppercase">
                           {booking.clientName}
                         </h4>
                       </div>
+
+                      {/* Prominent Client Mobile details bar */}
+                      {booking.phoneNumber && (
+                        <div className="flex items-center gap-2 pt-0.5">
+                          <span className="text-[11px] font-mono text-gray-400">Client Mobile:</span>
+                          <a
+                            href={`tel:${booking.phoneNumber}`}
+                            className="text-xs font-mono font-bold text-emerald-300 hover:underline flex items-center gap-1"
+                          >
+                            <Phone className="h-3 w-3 text-emerald-400" />
+                            <span>{booking.phoneNumber}</span>
+                          </a>
+                        </div>
+                      )}
 
                       {booking.customRequests && (
                         <p className="text-xs text-gray-400 font-serif italic mt-1 bg-black/30 p-2.5 rounded-xl border border-white/5">
@@ -336,6 +428,17 @@ export default function DailySchedule({ bookings, onUpdateBookingStatus, onDelet
                         </p>
                       )}
                     </div>
+
+                    {/* LIVE COUNTDOWN FOR ONGOING BOOKING */}
+                    {isLive && (
+                      <div className="mt-2 pt-2 border-t border-rose-500/20">
+                        <LiveCountdown 
+                          booking={booking} 
+                          onUpdateBookingStatus={onUpdateBookingStatus} 
+                          onUpdateBooking={onUpdateBooking} 
+                        />
+                      </div>
+                    )}
 
                     {/* Configured Equipment list */}
                     {booking.equipment && booking.equipment.length > 0 && (

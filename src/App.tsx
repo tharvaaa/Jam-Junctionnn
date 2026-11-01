@@ -168,6 +168,7 @@ export default function App() {
               id: docSnap.id,
               recipient: data.to || ADMIN_EMAIL,
               clientName: data.clientName || undefined,
+              phoneNumber: data.phoneNumber || undefined,
               subject: data.subject || "JAM JUNCTION Notification",
               body: data.body || "",
               type: data.subject?.includes("Analytics") || data.subject?.includes("Statement") ? "report" : 
@@ -214,8 +215,9 @@ export default function App() {
         to: clientEmail,
         adminAlertTo: ADMIN_EMAIL,
         clientName: newBooking.clientName,
+        phoneNumber: newBooking.phoneNumber || undefined,
         subject: `🎸 ${newBooking.clientName} — Booking Locked (${newBooking.type}, ${newBooking.hours} hrs @ ₹${newBooking.finalRate}/hr)`,
-        body: `Hi ${newBooking.clientName},\n\nYour session has been successfully reserved and locked into JAM JUNCTION Studio Schedule!\n\nClient / Band Name: ${newBooking.clientName}\n📅 Date: ${newBooking.date}\n⏱️ Duration: ${newBooking.hours} Hour${newBooking.hours !== 1 ? "s" : ""}\n🎸 Session Type: ${newBooking.type} Session (@ ₹${newBooking.finalRate}/hr)\n🎧 Total Bill: ₹${newBooking.totalAmount}\n📝 Requests: ${newBooking.customRequests || "None"}\n\n[DISPATCH AUDIT ALERT]\nAuto-dispatched and logged for studio supervisor: ${ADMIN_EMAIL}`,
+        body: `Hi ${newBooking.clientName},\n\nYour session has been successfully reserved and locked into JAM JUNCTION Studio Schedule!\n\nClient / Band Name: ${newBooking.clientName}\n${newBooking.phoneNumber ? `📞 Contact Phone: ${newBooking.phoneNumber}\n` : ""}📅 Date: ${newBooking.date}\n⏱️ Duration: ${newBooking.hours} Hour${newBooking.hours !== 1 ? "s" : ""}\n🎸 Session Type: ${newBooking.type} Session (@ ₹${newBooking.finalRate}/hr)\n🎧 Total Bill: ₹${newBooking.totalAmount}\n📝 Requests: ${newBooking.customRequests || "None"}\n\n[DISPATCH AUDIT ALERT]\nAuto-dispatched and logged for studio supervisor: ${ADMIN_EMAIL}`,
         bookingId: newBooking.id,
         hours: newBooking.hours,
         totalAmount: newBooking.totalAmount,
@@ -228,6 +230,7 @@ export default function App() {
         id: mailId,
         recipient: clientEmail,
         clientName: newBooking.clientName,
+        phoneNumber: newBooking.phoneNumber || undefined,
         subject: emailPayload.subject,
         body: emailPayload.body,
         type: "confirmation",
@@ -246,12 +249,32 @@ export default function App() {
     }
   };
 
-  const handleUpdateBookingStatus = async (id: string, newStatus: BookingStatus) => {
+  const handleUpdateBookingStatus = async (id: string, newStatus: BookingStatus, updates?: Partial<Booking>) => {
     const bookingsPath = "bookings";
     try {
-      await updateDoc(doc(db, bookingsPath, id), { status: newStatus });
+      const existing = bookings.find(b => b.id === id);
+      const updateData: Record<string, any> = { status: newStatus, ...(updates || {}) };
+      
+      // If moving to Live Now, record startedAt timestamp if not already present
+      if (newStatus === "Live Now" && !existing?.startedAt) {
+        updateData.startedAt = new Date().toISOString();
+      }
+
+      setBookings(prev => prev.map(b => b.id === id ? { ...b, ...updateData } : b));
+      await updateDoc(doc(db, bookingsPath, id), updateData);
       const client = bookings.find(b => b.id === id);
-      showToast(`Status updated in Firestore to: ${newStatus} for ${client?.clientName || "session"}.`, "info");
+      showToast(`Status updated: ${newStatus} for ${client?.clientName || "session"}.`, "info");
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, bookingsPath);
+    }
+  };
+
+  const handleUpdateBooking = async (id: string, updates: Partial<Booking>) => {
+    const bookingsPath = "bookings";
+    try {
+      setBookings(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
+      await updateDoc(doc(db, bookingsPath, id), updates);
+      showToast("Booking updated in cloud.", "info");
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, bookingsPath);
     }
@@ -376,51 +399,24 @@ export default function App() {
 
       {/* TOP MASTER LEVEL HEADER (Centered bold single-color JAM JUNCTION brand title) */}
       <header className="sticky top-0 z-40 bg-black/45 backdrop-filter backdrop-blur-md border-b border-white/5 px-4 md:px-8 py-5 pointer-events-auto">
-        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
           
-          {/* Left subtle indicator */}
-          <div className="hidden md:flex items-center gap-2 text-xs font-mono text-gray-400 w-48 shrink-0">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span className="text-[11px] text-gray-300">Live Studio Engine</span>
-          </div>
-
           {/* Centered Large Bold Single Color Brand Title (Music-Oriented Font, Solid White) */}
-          <div className="text-center flex-1 flex flex-col items-center justify-center">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black uppercase tracking-widest text-white select-none drop-shadow-md font-sans">
+          <div className="flex-1 flex items-center justify-start sm:justify-center">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-black uppercase tracking-widest text-white select-none drop-shadow-md font-sans">
               JAM JUNCTION
             </h1>
           </div>
 
-          {/* Right Live Clock, Dispatch shortcut & Lock Console */}
-          <div className="flex items-center gap-2 justify-center md:justify-end text-xs font-mono w-full md:w-auto shrink-0">
-            <div className="bg-[#121212]/80 border border-white/10 py-1.5 px-3 rounded-xl flex items-center gap-2 text-left">
-              <Clock className="h-3.5 w-3.5 text-purple-400" />
-              <span className="text-white font-mono text-xs font-bold">{currentTime || "Live"}</span>
-            </div>
-
-            <button
-              onClick={() => setActiveTab("timeline")}
-              className={`border px-3 py-1.5 rounded-xl flex items-center gap-1.5 cursor-pointer font-bold transition-all duration-300 ${
-                activeTab === "timeline"
-                  ? "bg-purple-600 border-purple-500 text-white shadow-md shadow-purple-600/30"
-                  : "bg-[#1C1C24]/90 hover:bg-purple-950/20 border-purple-500/25 text-purple-300 hover:text-white"
-              }`}
-              title="Go to Log Timeline"
-            >
-              <Mail className="h-3.5 w-3.5" />
-              <span>Timeline</span>
-              <span className="text-[10px] bg-purple-500/20 px-1.5 py-0.2 rounded-full font-mono">
-                {emailLogs.length}
-              </span>
-            </button>
-
+          {/* Right Lock Console */}
+          <div className="flex items-center gap-2 justify-end text-xs font-mono shrink-0">
             <button
               onClick={handleLogout}
-              className="bg-[#1C1C24]/90 hover:bg-red-950/40 border border-white/10 hover:border-red-500/40 text-gray-300 hover:text-red-300 px-3 py-1.5 rounded-xl flex items-center gap-1.5 cursor-pointer font-bold transition-all duration-300"
+              className="bg-[#1C1C24]/90 hover:bg-red-950/40 border border-white/10 hover:border-red-500/40 text-gray-300 hover:text-red-300 px-3.5 py-2 rounded-xl flex items-center gap-1.5 cursor-pointer font-bold transition-all duration-300"
               title="Lock studio console / Sign out"
             >
               <LogOut className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Lock</span>
+              <span>Lock</span>
             </button>
           </div>
 
@@ -428,41 +424,8 @@ export default function App() {
       </header>
 
       {/* CORE CONTENT BLOCK CONTAINER */}
-      <main className="max-w-7xl mx-auto px-4 md:px-8 pt-8 space-y-8 relative z-10">
+      <main className="max-w-7xl mx-auto px-4 md:px-8 pt-6 space-y-6 relative z-10">
         
-        {/* BRAND PROMOTIONS ACCENT */}
-        <div className="glass-panel p-6 rounded-3xl relative overflow-hidden pointer-events-auto transition-all duration-300">
-          <div className="absolute top-0 right-0 w-80 h-40 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
-          
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
-            <div>
-              <div className="flex items-center gap-2 text-purple-400 text-[10px] uppercase tracking-widest font-extrabold font-mono mb-1">
-                <span className="bg-purple-500/10 border border-purple-500/30 px-2 py-0.5 rounded-md flex items-center gap-1">
-                  <ShieldCheck className="h-3 w-3 text-emerald-400" />
-                  Direct Studio Console
-                </span>
-              </div>
-              <h2 className="text-2xl font-black text-[#F5F5F7]">Studio Command & Dispatch Console</h2>
-            </div>
-
-            {/* Quick dashboard figures counters */}
-            <div className="grid grid-cols-2 gap-4 w-full md:w-auto shrink-0 divide-x divide-white/5">
-              <div className="pl-4">
-                <span className="text-[10px] text-gray-500 uppercase tracking-wider block">Today's Sessions</span>
-                <span className="text-xl font-bold font-mono text-purple-400">
-                  {bookings.filter(b => b.date === "2026-05-26" && b.status !== "Cancelled").length} Active
-                </span>
-              </div>
-              <div className="pl-4">
-                <span className="text-[10px] text-gray-500 uppercase tracking-wider block">Dispatched Alerts</span>
-                <span className="text-xl font-bold font-mono text-pink-400">
-                  {emailLogs.length} Logs
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* INTERACTIVE NAVIGATION TABS: Command Center, Live Schedule, Revenue, Log Timeline, Scratchpad */}
         <div className="flex items-center bg-black/40 p-1.5 rounded-2xl border border-white/5 max-w-4xl pointer-events-auto overflow-x-auto">
           <button
@@ -547,6 +510,7 @@ export default function App() {
             <DailySchedule 
               bookings={bookings}
               onUpdateBookingStatus={handleUpdateBookingStatus}
+              onUpdateBooking={handleUpdateBooking}
               onDeleteBooking={handleDeleteBooking}
               onClearAllBookings={handleClearAllBookings}
             />
@@ -563,9 +527,11 @@ export default function App() {
           {activeTab === "timeline" && (
             <LogTimeline 
               emailLogs={emailLogs}
+              bookings={bookings}
               onSendEmailLog={handleSendEmailLog}
               supervisorEmail={supervisorEmail}
               onClearAllLogs={handleClearAllLogs}
+              onUpdateBookingStatus={handleUpdateBookingStatus}
             />
           )}
 
