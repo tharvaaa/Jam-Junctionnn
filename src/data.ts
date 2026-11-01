@@ -29,127 +29,7 @@ export const AVAILABLE_EQUIPMENT = [
   "Studio Headphones (Audio-Technica M50x)"
 ];
 
-const SEED_BOOKINGS: Booking[] = [
-  {
-    id: "b1",
-    clientName: "Paranoid Sunsets (Rock)",
-    date: "2026-05-26", // Today
-    timeSlot: "11:00 AM - 01:00 PM",
-    type: "Jam",
-    defaultRate: 350,
-    overrideRate: null,
-    finalRate: 350,
-    hours: 2,
-    totalAmount: 700,
-    status: "Completed",
-    equipment: ["Yamaha Stage Custom Drumkit", "Fender Frontman 212R Guitar Amp", "Ampeg BA-210 Bass Combo"],
-    customRequests: "Needs an extra microphone stand and 1/4 inch jacks",
-    reminderSent: true,
-    createdAt: "2026-05-24T12:30:00Z"
-  },
-  {
-    id: "b2",
-    clientName: "Symphony of Echoes (Metal)",
-    date: "2026-05-26", // Today
-    timeSlot: "03:00 PM - 05:00 PM",
-    type: "Recording",
-    defaultRate: 600,
-    overrideRate: 550, // Owner discount
-    finalRate: 550,
-    hours: 2,
-    totalAmount: 1100,
-    status: "Live Now",
-    equipment: ["Yamaha Stage Custom Drumkit", "Marshall MG100HCFX Half Stack", "Focusrite Scarlett 18i20 Interface", "Ampeg BA-210 Bass Combo"],
-    customRequests: "Multitrack recording of drum setup. Arriving 15 mins early.",
-    reminderSent: true,
-    createdAt: "2026-05-25T09:15:00Z"
-  },
-  {
-    id: "b3",
-    clientName: "Riya & Friends",
-    date: "2026-05-26", // Today
-    timeSlot: "07:00 PM - 09:00 PM",
-    type: "Karaoke",
-    defaultRate: 400,
-    overrideRate: null,
-    finalRate: 400,
-    hours: 2,
-    totalAmount: 800,
-    status: "Up Next",
-    equipment: ["Shure SM58 Vocal Microphone (Pair)", "JBL PRX815 Active PA Speakers"],
-    customRequests: "Needs additional screen / lyric display set up correctly",
-    reminderSent: false,
-    createdAt: "2026-05-26T08:00:00Z"
-  },
-  {
-    id: "b4",
-    clientName: "The Velvet Anthems (Indie)",
-    date: "2026-05-27", // Tomorrow
-    timeSlot: "01:00 PM - 03:00 PM",
-    type: "Jam",
-    defaultRate: 350,
-    overrideRate: null,
-    finalRate: 350,
-    hours: 2,
-    totalAmount: 700,
-    status: "Up Next",
-    equipment: ["Yamaha Stage Custom Drumkit", "Korg Triton LE Synthesizer/Keyboard", "Fender Frontman 212R Guitar Amp"],
-    customRequests: "Requesting key card access entry, setup synthesizer on the left stand",
-    reminderSent: false,
-    createdAt: "2026-05-25T14:40:00Z"
-  },
-  {
-    id: "b5",
-    clientName: "Sublime Resonance Project",
-    date: "2026-05-25", // Yesterday
-    timeSlot: "05:00 PM - 07:00 PM",
-    type: "Recording",
-    defaultRate: 600,
-    overrideRate: null,
-    finalRate: 600,
-    hours: 2,
-    totalAmount: 1200,
-    status: "Completed",
-    equipment: ["Focusrite Scarlett 18i20 Interface", "Studio Headphones (Audio-Technica M50x)", "Shure SM58 Vocal Microphone (Pair)"],
-    customRequests: "Vocal tuning session",
-    reminderSent: true,
-    createdAt: "2026-05-23T11:00:00Z"
-  },
-  {
-    id: "b6",
-    clientName: "Late Night Beats LLC",
-    date: "2026-05-25", // Yesterday
-    timeSlot: "09:00 PM - 11:00 PM",
-    type: "Karaoke",
-    defaultRate: 400,
-    overrideRate: 380, // discounted slightly
-    finalRate: 380,
-    hours: 2,
-    totalAmount: 760,
-    status: "Completed",
-    equipment: ["Shure SM58 Vocal Microphone (Pair)"],
-    customRequests: "Extra ambient neon lighting request",
-    reminderSent: true,
-    createdAt: "2026-05-24T18:20:00Z"
-  },
-  {
-    id: "b7",
-    clientName: "Jazz Fusion Quintet",
-    date: "2026-05-24", // Older
-    timeSlot: "03:00 PM - 05:00 PM",
-    type: "Jam",
-    defaultRate: 350,
-    overrideRate: null,
-    finalRate: 350,
-    hours: 2,
-    totalAmount: 700,
-    status: "Completed",
-    equipment: ["Yamaha Stage Custom Drumkit", "Korg Triton LE Synthesizer/Keyboard", "Ampeg BA-210 Bass Combo"],
-    customRequests: "Adjust piano velocity scale",
-    reminderSent: true,
-    createdAt: "2026-05-22T10:15:00Z"
-  }
-];
+export const SEED_BOOKINGS: Booking[] = [];
 
 export const SEED_NOTES: StudioNote[] = [
   {
@@ -186,13 +66,13 @@ export const loadInitialBookings = (): Booking[] => {
   const data = localStorage.getItem("jam_junction_bookings");
   if (data) {
     try {
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) return parsed;
     } catch {
-      return SEED_BOOKINGS;
+      return [];
     }
   }
-  localStorage.setItem("jam_junction_bookings", JSON.stringify(SEED_BOOKINGS));
-  return SEED_BOOKINGS;
+  return [];
 };
 
 export const loadInitialNotes = (): StudioNote[] => {

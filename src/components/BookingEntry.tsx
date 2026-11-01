@@ -32,7 +32,8 @@ export default function BookingEntry({ onAddBooking, onSendEmailLog, userEmail, 
   // Duration state (moved right after date): supports half-hour increments or any custom decimal hours
   const [hours, setHours] = useState<number>(2);
   const [sessionType, setSessionType] = useState<BookingType>("Jam");
-  const [customRecordingRate, setCustomRecordingRate] = useState(600); // Studio base for recording
+  // Fully editable hourly rate via keyboard input
+  const [hourlyRate, setHourlyRate] = useState<number>(350);
   const [customRequests, setCustomRequests] = useState("");
 
   // Submission feedback states
@@ -40,14 +41,7 @@ export default function BookingEntry({ onAddBooking, onSendEmailLog, userEmail, 
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [lastLoggedBooking, setLastLoggedBooking] = useState<{ id: string; name: string; amount: number; hours: number; date: string } | null>(null);
 
-  // Auto rate computation based on session type
-  const getBaseRate = (): number => {
-    if (sessionType === "Jam") return 350;
-    if (sessionType === "Karaoke") return 400;
-    return customRecordingRate;
-  };
-
-  const finalRate = getBaseRate();
+  const finalRate = hourlyRate;
   const totalAmount = Math.round(finalRate * hours);
 
   // Half-hour preset suggestions
@@ -58,6 +52,13 @@ export default function BookingEntry({ onAddBooking, onSendEmailLog, userEmail, 
       const next = Math.round((prev + delta) * 2) / 2;
       return Math.max(0.5, Math.min(24, next));
     });
+  };
+
+  const handleSessionTypeSelect = (type: BookingType) => {
+    setSessionType(type);
+    if (type === "Jam") setHourlyRate(350);
+    else if (type === "Karaoke") setHourlyRate(400);
+    else if (type === "Recording") setHourlyRate(600);
   };
 
   const handleSubmit = (e: FormEvent) => {
@@ -76,7 +77,7 @@ export default function BookingEntry({ onAddBooking, onSendEmailLog, userEmail, 
         date,
         timeSlot: `${hours}h Session`, // flexible duration-based slot
         type: sessionType,
-        defaultRate: getBaseRate(),
+        defaultRate: finalRate,
         overrideRate: null,
         finalRate,
         hours,
@@ -97,7 +98,7 @@ export default function BookingEntry({ onAddBooking, onSendEmailLog, userEmail, 
         recipient: clientEmail,
         clientName: trimmedName,
         subject: `🎸 ${trimmedName} — Booking Locked (${sessionType}, ${hours} hrs @ ₹${finalRate}/hr)`,
-        body: `Hi ${trimmedName},\n\nYour session has been successfully reserved and locked into THE JAM JUNCTION Studio Schedule!\n\nClient / Band Name: ${trimmedName}\n📅 Date: ${date}\n⏱️ Duration: ${hours} Hour${hours !== 1 ? "s" : ""}\n🎸 Session Specifics: ${sessionType} Session (${hours} Hrs @ ₹${finalRate}/hr)\n🎧 Total Bill: ₹${totalAmount}\n📝 Special Requests: ${customRequests.trim() || "None"}\n\n[DISPATCH ALERT: Copy delivered to supervisor ${userEmail}]\n\nKeep on Rocking!`,
+        body: `Hi ${trimmedName},\n\nYour session has been successfully reserved and locked into JAM JUNCTION Studio Schedule!\n\nClient / Band Name: ${trimmedName}\n📅 Date: ${date}\n⏱️ Duration: ${hours} Hour${hours !== 1 ? "s" : ""}\n🎸 Session Specifics: ${sessionType} Session (${hours} Hrs @ ₹${finalRate}/hr)\n🎧 Total Bill: ₹${totalAmount}\n📝 Special Requests: ${customRequests.trim() || "None"}\n\n[DISPATCH ALERT: Copy delivered to supervisor ${userEmail}]\n\nKeep on Rocking!`,
         type: "confirmation",
         timestamp: new Date().toISOString(),
         status: "sent",
@@ -151,15 +152,9 @@ export default function BookingEntry({ onAddBooking, onSendEmailLog, userEmail, 
                 </span>
               </h2>
               <p className="text-xs text-gray-400 font-serif italic mt-0.5">
-                Register soundcheck & rehearsal sessions with custom flexible duration and real-time cloud dispatch
+                Register soundcheck & rehearsal sessions with custom flexible duration and rate
               </p>
             </div>
-          </div>
-
-          {/* Real-time sync badge */}
-          <div className="hidden sm:flex items-center gap-2 text-xs font-mono text-emerald-400 bg-emerald-950/20 border border-emerald-500/30 px-3 py-1.5 rounded-xl">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            <span>Cloud Sync Active</span>
           </div>
         </div>
 
@@ -276,7 +271,7 @@ export default function BookingEntry({ onAddBooking, onSendEmailLog, userEmail, 
             </div>
           </div>
 
-          {/* 4. SESSION MODE & BASE RATE ROW */}
+          {/* 4. SESSION MODE & EDITABLE HOURLY RATE ROW */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-gray-300 uppercase tracking-widest mb-1.5 font-mono">
@@ -287,7 +282,7 @@ export default function BookingEntry({ onAddBooking, onSendEmailLog, userEmail, 
                   <button
                     key={type}
                     type="button"
-                    onClick={() => setSessionType(type)}
+                    onClick={() => handleSessionTypeSelect(type)}
                     className={`py-3 px-2 rounded-xl text-xs font-bold transition-all duration-300 cursor-pointer flex flex-col items-center gap-1.5 border ${
                       sessionType === type
                         ? type === "Jam"
@@ -307,28 +302,48 @@ export default function BookingEntry({ onAddBooking, onSendEmailLog, userEmail, 
               </div>
             </div>
 
+            {/* FULL KEYBOARD RATE INPUT */}
             <div>
-              <label className="block text-xs font-bold text-gray-300 uppercase tracking-widest mb-1.5 font-mono">
-                {sessionType === "Recording" ? "Studio Recording Rate (₹/hr)" : "Standard Rate (₹/hr)"}
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-bold text-gray-300 uppercase tracking-widest font-mono">
+                  Hourly Rate (₹/hr) *
+                </label>
+                <span className="text-[10px] text-purple-300 font-mono">Type any custom price</span>
+              </div>
               <div className="relative">
-                <DollarSign className="absolute left-3.5 top-3.5 h-4 w-4 text-purple-400" />
-                {sessionType === "Recording" ? (
-                  <input
-                    type="number"
-                    min={100}
-                    step={50}
-                    value={customRecordingRate}
-                    onChange={(e) => setCustomRecordingRate(Math.max(100, parseInt(e.target.value) || 0))}
-                    className="w-full pl-10 pr-4 py-3 rounded-xl text-sm text-white font-mono border input-interactive"
-                    placeholder="Rate per hour"
-                  />
-                ) : (
-                  <div className="w-full pl-10 pr-4 py-3 rounded-xl text-sm text-white font-mono border bg-black/40 border-white/10 flex items-center justify-between select-none">
-                    <span>₹{getBaseRate()} / hour</span>
-                    <span className="text-[10px] text-gray-400 uppercase tracking-wider">Fixed standard</span>
-                  </div>
-                )}
+                <DollarSign className="absolute left-3.5 top-3.5 h-4 w-4 text-purple-400 pointer-events-none" />
+                <input
+                  type="number"
+                  min={0}
+                  step={25}
+                  value={hourlyRate === 0 ? "" : hourlyRate}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    setHourlyRate(isNaN(val) ? 0 : Math.max(0, val));
+                  }}
+                  className="w-full pl-10 pr-14 py-3 rounded-xl text-sm text-white font-mono font-bold border input-interactive bg-black/50 focus:outline-none focus:border-purple-400"
+                  placeholder="Type price..."
+                />
+                <span className="absolute right-3.5 top-3.5 text-xs font-mono text-gray-400 pointer-events-none">₹/hr</span>
+              </div>
+              
+              {/* Quick rate shortcut chips */}
+              <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                <span className="text-[10px] text-gray-500 font-mono mr-1">Presets:</span>
+                {[300, 350, 400, 500, 600, 800].map((amt) => (
+                  <button
+                    key={amt}
+                    type="button"
+                    onClick={() => setHourlyRate(amt)}
+                    className={`px-2 py-0.5 rounded text-[11px] font-mono font-bold border cursor-pointer transition-all ${
+                      hourlyRate === amt
+                        ? "bg-purple-600 border-purple-500 text-white"
+                        : "bg-white/5 border-white/10 text-gray-400 hover:text-white"
+                    }`}
+                  >
+                    ₹{amt}
+                  </button>
+                ))}
               </div>
             </div>
           </div>

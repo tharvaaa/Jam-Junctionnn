@@ -67,95 +67,34 @@ export default function App() {
   // 2. Real-Time Cloud Firestore Sync for Bookings, Studio Notes, and Mail
   useEffect(() => {
     // A. Real-time Firestore Listener: bookings
+    // A. Real-time Firestore Listener: bookings (Purging test band names and never re-seeding)
     const bookingsPath = "bookings";
+    const testIds = new Set(["b1", "b2", "b3", "b4", "b5", "b6", "b7"]);
+    const testBandKeywords = [
+      "paranoid sunsets", "symphony of echoes", "riya & friends",
+      "velvet anthems", "sublime resonance", "late night beats", "jazz fusion"
+    ];
+
     const unsubscribeBookings = onSnapshot(
       collection(db, bookingsPath),
       async (snapshot) => {
         if (snapshot.empty) {
-          const initialSeed: Booking[] = [
-            {
-              id: "b1",
-              clientName: "Paranoid Sunsets (Rock)",
-              date: "2026-05-26",
-              timeSlot: "11:00 AM - 01:00 PM",
-              type: "Jam",
-              defaultRate: 350,
-              overrideRate: null,
-              finalRate: 350,
-              hours: 2,
-              totalAmount: 700,
-              status: "Completed",
-              equipment: ["Yamaha Stage Custom Drumkit", "Fender Frontman 212R Guitar Amp", "Ampeg BA-210 Bass Combo"],
-              customRequests: "Needs an extra microphone stand and 1/4 inch jacks",
-              reminderSent: true,
-              createdAt: "2026-05-24T12:30:00Z"
-            },
-            {
-              id: "b2",
-              clientName: "Symphony of Echoes (Metal)",
-              date: "2026-05-26",
-              timeSlot: "03:00 PM - 05:00 PM",
-              type: "Recording",
-              defaultRate: 600,
-              overrideRate: null,
-              finalRate: 600,
-              hours: 2,
-              totalAmount: 1200,
-              status: "Live Now",
-              equipment: ["Yamaha Stage Custom Drumkit", "Marshall MG100HCFX Half Stack", "Focusrite Scarlett 18i20 Interface", "Ampeg BA-210 Bass Combo"],
-              customRequests: "Multitrack recording of drum setup. Arriving 15 mins early.",
-              reminderSent: true,
-              createdAt: "2026-05-25T09:15:00Z"
-            },
-            {
-              id: "b3",
-              clientName: "Riya & Friends",
-              date: "2026-05-26",
-              timeSlot: "07:00 PM - 09:00 PM",
-              type: "Karaoke",
-              defaultRate: 400,
-              overrideRate: null,
-              finalRate: 400,
-              hours: 2,
-              totalAmount: 800,
-              status: "Up Next",
-              equipment: ["Shure SM58 Vocal Microphone (Pair)", "JBL PRX815 Active PA Speakers"],
-              customRequests: "Needs additional screen / lyric display set up correctly",
-              reminderSent: false,
-              createdAt: "2026-05-26T08:00:00Z"
-            },
-            {
-              id: "b4",
-              clientName: "The Velvet Anthems (Indie)",
-              date: "2026-05-27",
-              timeSlot: "01:00 PM - 03:00 PM",
-              type: "Jam",
-              defaultRate: 350,
-              overrideRate: null,
-              finalRate: 350,
-              hours: 2.5,
-              totalAmount: 875,
-              status: "Up Next",
-              equipment: ["Yamaha Stage Custom Drumkit", "Korg Triton LE Synthesizer/Keyboard", "Fender Frontman 212R Guitar Amp"],
-              customRequests: "Requesting key card access entry, setup synthesizer on the left stand",
-              reminderSent: false,
-              createdAt: "2026-05-25T14:40:00Z"
-            }
-          ];
-
-          for (const b of initialSeed) {
-            try {
-              await setDoc(doc(db, bookingsPath, b.id), b);
-            } catch (err) {
-              handleFirestoreError(err, OperationType.WRITE, bookingsPath);
-            }
-          }
-          setBookings(initialSeed);
+          setBookings([]);
         } else {
           const loaded: Booking[] = [];
-          snapshot.forEach((docSnap) => {
-            loaded.push(docSnap.data() as Booking);
-          });
+          for (const docSnap of snapshot.docs) {
+            const data = docSnap.data() as Booking;
+            const isTest = 
+              testIds.has(docSnap.id) || 
+              (data.clientName && testBandKeywords.some(kw => data.clientName.toLowerCase().includes(kw)));
+            
+            if (isTest) {
+              // Automatically purge existing test band documents from Cloud Firestore
+              deleteDoc(doc(db, bookingsPath, docSnap.id)).catch(() => {});
+            } else {
+              loaded.push(data);
+            }
+          }
           loaded.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
           setBookings(loaded);
         }
@@ -194,7 +133,7 @@ export default function App() {
       }
     );
 
-    // C. Real-time Firestore Listener: mail (Email dispatch trigger records)
+    // C. Real-time Firestore Listener: mail (Purging test dummy logs and never re-seeding)
     const mailPath = "mail";
     const unsubscribeMail = onSnapshot(
       collection(db, mailPath),
@@ -202,50 +141,33 @@ export default function App() {
         const loadedLogs: EmailLog[] = [];
         snapshot.forEach((docSnap) => {
           const data = docSnap.data();
-          loadedLogs.push({
-            id: docSnap.id,
-            recipient: data.to || ADMIN_EMAIL,
-            clientName: data.clientName || undefined,
-            subject: data.subject || "THE JAM JUNCTION Notification",
-            body: data.body || "",
-            type: data.subject?.includes("Analytics") || data.subject?.includes("Statement") ? "report" : 
-                  data.subject?.includes("Reminder") || data.subject?.includes("Alert") ? "reminder" : "confirmation",
-            timestamp: data.createdAt || new Date().toISOString(),
-            status: data.status === "failed" ? "failed" : "sent",
-            bookingId: data.bookingId,
-            hours: data.hours,
-            totalAmount: data.totalAmount
-          });
+          const isTest = 
+            docSnap.id.startsWith("e_init_") || 
+            (data.clientName && testBandKeywords.some(kw => data.clientName.toLowerCase().includes(kw))) ||
+            (data.subject && testBandKeywords.some(kw => data.subject.toLowerCase().includes(kw)));
+
+          if (isTest) {
+            deleteDoc(doc(db, mailPath, docSnap.id)).catch(() => {});
+          } else {
+            loadedLogs.push({
+              id: docSnap.id,
+              recipient: data.to || ADMIN_EMAIL,
+              clientName: data.clientName || undefined,
+              subject: data.subject || "JAM JUNCTION Notification",
+              body: data.body || "",
+              type: data.subject?.includes("Analytics") || data.subject?.includes("Statement") ? "report" : 
+                    data.subject?.includes("Reminder") || data.subject?.includes("Alert") ? "reminder" : "confirmation",
+              timestamp: data.createdAt || new Date().toISOString(),
+              status: data.status === "failed" ? "failed" : "sent",
+              bookingId: data.bookingId,
+              hours: data.hours,
+              totalAmount: data.totalAmount
+            });
+          }
         });
 
-        if (loadedLogs.length === 0) {
-          const seedLogs: EmailLog[] = [
-            {
-              id: "e_init_1",
-              recipient: "paranoidsunsets@gmail.com",
-              clientName: "Paranoid Sunsets (Rock)",
-              subject: "🎸 Paranoid Sunsets (Rock) — Booking Confirmation",
-              body: "Your session has been successfully locked into our daily scheduler.",
-              type: "confirmation",
-              timestamp: "2026-05-24T12:30:10Z",
-              status: "sent"
-            },
-            {
-              id: "e_init_2",
-              recipient: ADMIN_EMAIL,
-              clientName: "Symphony of Echoes (Metal)",
-              subject: "⚡ THE JAM JUNCTION - Soundcheck Reminder Alert (60 min)",
-              body: "Dispatch alert sent to supervisor: Recording Session starts in 1 hour.",
-              type: "reminder",
-              timestamp: "2026-05-26T14:00:00Z",
-              status: "sent"
-            }
-          ];
-          setEmailLogs(seedLogs);
-        } else {
-          loadedLogs.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
-          setEmailLogs(loadedLogs);
-        }
+        loadedLogs.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+        setEmailLogs(loadedLogs);
       },
       (error) => {
         handleFirestoreError(error, OperationType.GET, mailPath);
@@ -278,7 +200,7 @@ export default function App() {
         adminAlertTo: ADMIN_EMAIL,
         clientName: newBooking.clientName,
         subject: `🎸 ${newBooking.clientName} — Booking Locked (${newBooking.type}, ${newBooking.hours} hrs @ ₹${newBooking.finalRate}/hr)`,
-        body: `Hi ${newBooking.clientName},\n\nYour session has been successfully reserved and locked into THE JAM JUNCTION Studio Schedule!\n\nClient / Band Name: ${newBooking.clientName}\n📅 Date: ${newBooking.date}\n⏱️ Duration: ${newBooking.hours} Hour${newBooking.hours !== 1 ? "s" : ""}\n🎸 Session Type: ${newBooking.type} Session (@ ₹${newBooking.finalRate}/hr)\n🎧 Total Bill: ₹${newBooking.totalAmount}\n📝 Requests: ${newBooking.customRequests || "None"}\n\n[DISPATCH AUDIT ALERT]\nAuto-dispatched and logged for studio supervisor: ${ADMIN_EMAIL}`,
+        body: `Hi ${newBooking.clientName},\n\nYour session has been successfully reserved and locked into JAM JUNCTION Studio Schedule!\n\nClient / Band Name: ${newBooking.clientName}\n📅 Date: ${newBooking.date}\n⏱️ Duration: ${newBooking.hours} Hour${newBooking.hours !== 1 ? "s" : ""}\n🎸 Session Type: ${newBooking.type} Session (@ ₹${newBooking.finalRate}/hr)\n🎧 Total Bill: ₹${newBooking.totalAmount}\n📝 Requests: ${newBooking.customRequests || "None"}\n\n[DISPATCH AUDIT ALERT]\nAuto-dispatched and logged for studio supervisor: ${ADMIN_EMAIL}`,
         bookingId: newBooking.id,
         hours: newBooking.hours,
         totalAmount: newBooking.totalAmount,
@@ -327,6 +249,33 @@ export default function App() {
       showToast("Booking permanently removed from Cloud Firestore.", "info");
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, bookingsPath);
+    }
+  };
+
+  const handleClearAllBookings = async () => {
+    const bookingsPath = "bookings";
+    try {
+      for (const b of bookings) {
+        await deleteDoc(doc(db, bookingsPath, b.id)).catch(() => {});
+      }
+      setBookings([]);
+      localStorage.removeItem("jam_junction_bookings");
+      showToast("All scheduled sessions cleared.", "info");
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, bookingsPath);
+    }
+  };
+
+  const handleClearAllLogs = async () => {
+    const mailPath = "mail";
+    try {
+      for (const l of emailLogs) {
+        await deleteDoc(doc(db, mailPath, l.id)).catch(() => {});
+      }
+      setEmailLogs([]);
+      showToast("All dispatch & email logs cleared.", "info");
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, mailPath);
     }
   };
 
@@ -398,7 +347,7 @@ export default function App() {
         </div>
       )}
 
-      {/* TOP MASTER LEVEL HEADER (Supervisor tab removed; centered big bold italic capital cursive brand title) */}
+      {/* TOP MASTER LEVEL HEADER (Centered bold single-color JAM JUNCTION brand title) */}
       <header className="sticky top-0 z-40 bg-black/45 backdrop-filter backdrop-blur-md border-b border-white/5 px-4 md:px-8 py-5 pointer-events-auto">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           
@@ -408,14 +357,11 @@ export default function App() {
             <span className="text-[11px] text-gray-300">Live Studio Engine</span>
           </div>
 
-          {/* Centered Large Bold Italic Capital Cursive Brand Title */}
+          {/* Centered Large Bold Single Color Brand Title (Music-Oriented Font, Solid White) */}
           <div className="text-center flex-1 flex flex-col items-center justify-center">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black italic uppercase tracking-wider font-cursive select-none animate-hue-loop bg-gradient-to-r from-purple-300 via-pink-400 to-indigo-300 bg-clip-text text-transparent drop-shadow-sm">
-              THE JAM JUNCTION
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black uppercase tracking-widest text-white select-none drop-shadow-md font-sans">
+              JAM JUNCTION
             </h1>
-            <p className="text-[11px] sm:text-xs text-purple-300 font-serif italic tracking-widest mt-1">
-              where soundchecks turn into masterpieces.
-            </p>
           </div>
 
           {/* Right Live Clock & Dispatch shortcut */}
@@ -459,7 +405,6 @@ export default function App() {
                   <ShieldCheck className="h-3 w-3 text-emerald-400" />
                   Direct Studio Console
                 </span>
-                <span>Real-Time Cloud Sync Active</span>
               </div>
               <h2 className="text-2xl font-black text-[#F5F5F7]">Studio Command & Dispatch Console</h2>
             </div>
@@ -567,6 +512,7 @@ export default function App() {
               bookings={bookings}
               onUpdateBookingStatus={handleUpdateBookingStatus}
               onDeleteBooking={handleDeleteBooking}
+              onClearAllBookings={handleClearAllBookings}
             />
           )}
 
@@ -583,6 +529,7 @@ export default function App() {
               emailLogs={emailLogs}
               onSendEmailLog={handleSendEmailLog}
               supervisorEmail={supervisorEmail}
+              onClearAllLogs={handleClearAllLogs}
             />
           )}
 

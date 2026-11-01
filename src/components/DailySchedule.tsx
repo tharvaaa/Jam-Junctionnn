@@ -15,9 +15,11 @@ interface DailyScheduleProps {
   bookings: Booking[];
   onUpdateBookingStatus: (id: string, newStatus: BookingStatus) => void;
   onDeleteBooking: (id: string) => void;
+  onClearAllBookings?: () => void;
 }
 
-export default function DailySchedule({ bookings, onUpdateBookingStatus, onDeleteBooking }: DailyScheduleProps) {
+export default function DailySchedule({ bookings, onUpdateBookingStatus, onDeleteBooking, onClearAllBookings }: DailyScheduleProps) {
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   // Today's real local ISO date string
   const todayDateStr = useMemo(() => {
     const now = new Date();
@@ -158,22 +160,57 @@ export default function DailySchedule({ bookings, onUpdateBookingStatus, onDelet
             ))}
           </div>
 
-          {/* Date Picker */}
-          <div className="flex items-center gap-2 w-full md:w-auto font-mono text-xs">
-            <span className="text-gray-400 font-semibold">Filter Date:</span>
-            <input
-              type="date"
-              value={selectedDate === "all" ? "" : selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value || "all")}
-              className="bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-purple-500 cursor-pointer text-xs"
-            />
-            {selectedDate !== "all" && (
-              <button
-                onClick={() => setSelectedDate("all")}
-                className="text-[10px] text-purple-300 hover:underline uppercase font-bold"
-              >
-                Clear
-              </button>
+          {/* Date Picker & Clear All Sessions Action */}
+          <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto font-mono text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-gray-400 font-semibold">Filter Date:</span>
+              <input
+                type="date"
+                value={selectedDate === "all" ? "" : selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value || "all")}
+                className="bg-black/50 border border-white/10 rounded-xl px-3 py-2 text-white focus:outline-none focus:border-purple-500 cursor-pointer text-xs"
+              />
+              {selectedDate !== "all" && (
+                <button
+                  onClick={() => setSelectedDate("all")}
+                  className="text-[10px] text-purple-300 hover:underline uppercase font-bold"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
+
+            {onClearAllBookings && (
+              showClearConfirm ? (
+                <div className="flex items-center gap-1.5 bg-red-950/40 border border-red-500/50 p-1 rounded-xl animate-fadeIn">
+                  <span className="text-[10px] text-red-200 font-bold px-1">Clear all sessions?</span>
+                  <button
+                    onClick={() => {
+                      onClearAllBookings();
+                      setShowClearConfirm(false);
+                    }}
+                    className="px-2 py-0.5 bg-red-600 hover:bg-red-500 text-white rounded text-[10px] font-bold uppercase transition-all cursor-pointer"
+                  >
+                    Yes, Clear
+                  </button>
+                  <button
+                    onClick={() => setShowClearConfirm(false)}
+                    className="px-1.5 py-0.5 bg-white/10 hover:bg-white/20 text-gray-300 rounded text-[10px] font-bold transition-all cursor-pointer"
+                  >
+                    No
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowClearConfirm(true)}
+                  disabled={bookings.length === 0}
+                  className="cursor-pointer bg-red-950/20 hover:bg-red-900/30 text-red-300 hover:text-white border border-red-500/30 px-2.5 py-2 rounded-xl font-bold text-[11px] uppercase tracking-wider flex items-center gap-1 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  title="Clear all scheduled sessions"
+                >
+                  <Trash2 className="h-3 w-3" />
+                  <span>Clear All Sessions</span>
+                </button>
+              )
             )}
           </div>
         </div>

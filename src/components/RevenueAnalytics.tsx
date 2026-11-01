@@ -243,7 +243,7 @@ ${index + 1}. ${b.clientName} [${b.type}]
 
     const reportBody = `
 ============================================================
-THE JAM JUNCTION - OFFICIAL MONTHLY FINANCIAL ANALYTICS
+JAM JUNCTION - OFFICIAL MONTHLY FINANCIAL ANALYTICS
 Statement for: ${formattedMonth.toUpperCase()}
 Generated on: ${new Date().toLocaleString()}
 Domain: jamjunction.me
@@ -275,7 +275,7 @@ ${bookingRowsText.trim() || "No bookings recorded for this period."}
 
 ============================================================
 Audit record compiled from Cloud Firestore database.
-All metrics synced with THE JAM JUNCTION telemetry.
+All metrics synced with JAM JUNCTION telemetry.
 ============================================================
 `;
     return reportBody.trim();
@@ -295,7 +295,7 @@ All metrics synced with THE JAM JUNCTION telemetry.
     const emailLog: EmailLog = {
       id: mailId,
       recipient: recipientEmail,
-      subject: `📊 THE JAM JUNCTION - ${formattedMonth} Monthly Financial & Bookings Statement`,
+      subject: `📊 JAM JUNCTION - ${formattedMonth} Monthly Financial & Bookings Statement`,
       body: reportText,
       type: "report",
       timestamp: new Date().toISOString(),
