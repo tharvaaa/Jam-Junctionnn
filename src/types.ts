@@ -40,4 +40,8 @@ export interface EmailLog {
   type: "confirmation" | "reminder" | "report";
   timestamp: string;
   status: "sent" | "failed";
+  clientName?: string;
+  bookingId?: string;
+  hours?: number;
+  totalAmount?: number;
 }

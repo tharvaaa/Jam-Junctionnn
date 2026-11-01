@@ -232,7 +232,7 @@ export default function StudioNotes({ notes, onAddNote, onDeleteNote, onUpdateNo
                 <div
                   key={note.id}
                   id={`note-card-${note.id}`}
-                  className={`glass-panel rounded-2xl p-5 border flex flex-col justify-between gap-4 transition-all duration-300 hover:shadow-lg ${theme.bg} ${theme.border} pointer-events-auto`}
+                  className={`glass-panel rounded-2xl p-5 border flex flex-col justify-between gap-4 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-purple-500/10 hover:border-purple-500/30 ${theme.bg} ${theme.border} pointer-events-auto`}
                 >
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">

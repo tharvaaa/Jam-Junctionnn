@@ -1,14 +1,17 @@
-import { db } from './firebase';
-import { collection, addDoc, getDocs } from 'firebase/firestore';
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
 import { useState, useEffect } from "react";
 import { Booking, StudioNote, EmailLog, BookingStatus } from "./types";
-import { TIME_SLOTS, SEED_NOTES } from "./data";
+import { SEED_NOTES } from "./data";
 import InteractiveBackground from "./components/InteractiveBackground";
 import BookingEntry from "./components/BookingEntry";
 import DailySchedule from "./components/DailySchedule";
 import RevenueAnalytics from "./components/RevenueAnalytics";
 import StudioNotes from "./components/StudioNotes";
+import LogTimeline from "./components/LogTimeline";
 import { 
   db, 
   testConnection, 
@@ -25,7 +28,7 @@ import {
 
 import { 
   Calendar, Sliders, DollarSign, BookOpen, 
-  Terminal, Mail, ShieldCheck
+  Mail, ShieldCheck, Clock
 } from "lucide-react";
 
 export default function App() {
@@ -37,11 +40,9 @@ export default function App() {
   const [emailLogs, setEmailLogs] = useState<EmailLog[]>([]);
   const [isDbConnected, setIsDbConnected] = useState(false);
   
-  // Navigation
-  const [activeTab, setActiveTab] = useState<"entry" | "schedule" | "revenue" | "notes">("entry");
+  // Navigation tabs (Added "timeline" tab, removed supervisor tab from header)
+  const [activeTab, setActiveTab] = useState<"entry" | "schedule" | "revenue" | "timeline" | "notes">("entry");
   
-  // Logs drawer toggler
-  const [isLogsOpen, setIsLogsOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState<string>("");
 
   // Toast notification feedback
@@ -49,24 +50,18 @@ export default function App() {
 
   // 1. Initial Connection Test & Live Clock
   useEffect(() => {
-    // Validate connection to Firestore as mandated by Firebase architecture guidelines
     testConnection().then((connected) => {
       setIsDbConnected(connected);
     });
 
-    // Live clock running using user's metadata time anchor
-    const dateAnchor = new Date("2026-05-26T20:37:10Z");
-    let secondsElapsed = 0;
-    
-    const timer = setInterval(() => {
-      secondsElapsed++;
-      const current = new Date(dateAnchor.getTime() + secondsElapsed * 1000);
-      setCurrentTime(current.toLocaleTimeString("en-US", { hour12: true }));
-    }, 1000);
-
-    return () => {
-      clearInterval(timer);
+    const updateClock = () => {
+      const now = new Date();
+      setCurrentTime(now.toLocaleTimeString("en-US", { hour12: true }));
     };
+    updateClock();
+    const timer = setInterval(updateClock, 1000);
+
+    return () => clearInterval(timer);
   }, []);
 
   // 2. Real-Time Cloud Firestore Sync for Bookings, Studio Notes, and Mail
@@ -77,7 +72,6 @@ export default function App() {
       collection(db, bookingsPath),
       async (snapshot) => {
         if (snapshot.empty) {
-          // If first boot on fresh database, seed initial studio bookings to Firestore
           const initialSeed: Booking[] = [
             {
               id: "b1",
@@ -103,10 +97,10 @@ export default function App() {
               timeSlot: "03:00 PM - 05:00 PM",
               type: "Recording",
               defaultRate: 600,
-              overrideRate: 550,
-              finalRate: 550,
+              overrideRate: null,
+              finalRate: 600,
               hours: 2,
-              totalAmount: 1100,
+              totalAmount: 1200,
               status: "Live Now",
               equipment: ["Yamaha Stage Custom Drumkit", "Marshall MG100HCFX Half Stack", "Focusrite Scarlett 18i20 Interface", "Ampeg BA-210 Bass Combo"],
               customRequests: "Multitrack recording of drum setup. Arriving 15 mins early.",
@@ -139,8 +133,8 @@ export default function App() {
               defaultRate: 350,
               overrideRate: null,
               finalRate: 350,
-              hours: 2,
-              totalAmount: 700,
+              hours: 2.5,
+              totalAmount: 875,
               status: "Up Next",
               equipment: ["Yamaha Stage Custom Drumkit", "Korg Triton LE Synthesizer/Keyboard", "Fender Frontman 212R Guitar Amp"],
               customRequests: "Requesting key card access entry, setup synthesizer on the left stand",
@@ -162,7 +156,6 @@ export default function App() {
           snapshot.forEach((docSnap) => {
             loaded.push(docSnap.data() as Booking);
           });
-          // Sort chronologically
           loaded.sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
           setBookings(loaded);
         }
@@ -178,7 +171,6 @@ export default function App() {
       collection(db, notesPath),
       async (snapshot) => {
         if (snapshot.empty) {
-          // Seed default notes to Firestore
           const defaultNotes = SEED_NOTES || [];
           for (const n of defaultNotes) {
             try {
@@ -213,21 +205,26 @@ export default function App() {
           loadedLogs.push({
             id: docSnap.id,
             recipient: data.to || ADMIN_EMAIL,
+            clientName: data.clientName || undefined,
             subject: data.subject || "THE JAM JUNCTION Notification",
             body: data.body || "",
-            type: "confirmation",
+            type: data.subject?.includes("Analytics") || data.subject?.includes("Statement") ? "report" : 
+                  data.subject?.includes("Reminder") || data.subject?.includes("Alert") ? "reminder" : "confirmation",
             timestamp: data.createdAt || new Date().toISOString(),
-            status: data.status === "failed" ? "failed" : "sent"
+            status: data.status === "failed" ? "failed" : "sent",
+            bookingId: data.bookingId,
+            hours: data.hours,
+            totalAmount: data.totalAmount
           });
         });
 
-        // Add seed logs if mail collection is fresh
         if (loadedLogs.length === 0) {
           const seedLogs: EmailLog[] = [
             {
               id: "e_init_1",
               recipient: "paranoidsunsets@gmail.com",
-              subject: "🎹 THE JAM JUNCTION - Booking Confirmation for 2026-05-26",
+              clientName: "Paranoid Sunsets (Rock)",
+              subject: "🎸 Paranoid Sunsets (Rock) — Booking Confirmation",
               body: "Your session has been successfully locked into our daily scheduler.",
               type: "confirmation",
               timestamp: "2026-05-24T12:30:10Z",
@@ -236,6 +233,7 @@ export default function App() {
             {
               id: "e_init_2",
               recipient: ADMIN_EMAIL,
+              clientName: "Symphony of Echoes (Metal)",
               subject: "⚡ THE JAM JUNCTION - Soundcheck Reminder Alert (60 min)",
               body: "Dispatch alert sent to supervisor: Recording Session starts in 1 hour.",
               type: "reminder",
@@ -266,28 +264,46 @@ export default function App() {
     const bookingsPath = "bookings";
     const mailPath = "mail";
     try {
-      // 1. Write booking directly to Cloud Firestore 'bookings' collection
+      // 1. Immediately update bookings state so UI reflects it synchronously in schedule/revenue
+      setBookings((prev) => [newBooking, ...prev.filter((b) => b.id !== newBooking.id)]);
+
       await setDoc(doc(db, bookingsPath, newBooking.id), newBooking);
 
-      // 2. Trigger automatic booking confirmation email and dispatch log alert to narkhedeatharva2106@gmail.com
+      // Trigger automatic booking confirmation email and dispatch log alert to narkhedeatharva2106@gmail.com
       const clientEmail = `${newBooking.clientName.trim().replace(/\s+/g, "").toLowerCase()}@gmail.com`;
       const mailId = "mail_" + Date.now() + "_" + Math.random().toString(36).substring(2, 8);
 
       const emailPayload = {
         to: clientEmail,
         adminAlertTo: ADMIN_EMAIL,
-        subject: `🎹 THE JAM JUNCTION - Booking Confirmation for ${newBooking.date} (${newBooking.clientName})`,
-        body: `Hi ${newBooking.clientName},\n\nYour session has been successfully reserved and locked into THE JAM JUNCTION Studio Schedule!\n\n📅 Date: ${newBooking.date}\n⏰ Time Slot: ${newBooking.timeSlot}\n🎸 Session Type: ${newBooking.type} Session (${newBooking.hours} Hrs @ ₹${newBooking.finalRate}/hr)\n🎧 Total Bill: ₹${newBooking.totalAmount}\n🛠️ Reserved Equipment: ${newBooking.equipment.join(", ") || "Standard Studio Gear"}\n📝 Requests: ${newBooking.customRequests || "None"}\n\n[DISPATCH AUDIT ALERT]\nAuto-dispatched and logged for studio supervisor: ${ADMIN_EMAIL}`,
-        bookingId: newBooking.id,
         clientName: newBooking.clientName,
+        subject: `🎸 ${newBooking.clientName} — Booking Locked (${newBooking.type}, ${newBooking.hours} hrs @ ₹${newBooking.finalRate}/hr)`,
+        body: `Hi ${newBooking.clientName},\n\nYour session has been successfully reserved and locked into THE JAM JUNCTION Studio Schedule!\n\nClient / Band Name: ${newBooking.clientName}\n📅 Date: ${newBooking.date}\n⏱️ Duration: ${newBooking.hours} Hour${newBooking.hours !== 1 ? "s" : ""}\n🎸 Session Type: ${newBooking.type} Session (@ ₹${newBooking.finalRate}/hr)\n🎧 Total Bill: ₹${newBooking.totalAmount}\n📝 Requests: ${newBooking.customRequests || "None"}\n\n[DISPATCH AUDIT ALERT]\nAuto-dispatched and logged for studio supervisor: ${ADMIN_EMAIL}`,
+        bookingId: newBooking.id,
+        hours: newBooking.hours,
+        totalAmount: newBooking.totalAmount,
         status: "sent",
         createdAt: new Date().toISOString()
       };
 
-      // Write email document to Firestore 'mail' collection
-      await setDoc(doc(db, mailPath, mailId), emailPayload);
+      // 2. Immediately update local email logs state so timeline shows it with the client name right away
+      const newEmailLog: EmailLog = {
+        id: mailId,
+        recipient: clientEmail,
+        clientName: newBooking.clientName,
+        subject: emailPayload.subject,
+        body: emailPayload.body,
+        type: "confirmation",
+        timestamp: emailPayload.createdAt,
+        status: "sent",
+        bookingId: newBooking.id,
+        hours: newBooking.hours,
+        totalAmount: newBooking.totalAmount
+      };
+      setEmailLogs((prev) => [newEmailLog, ...prev.filter((l) => l.id !== mailId)]);
 
-      showToast(`✓ Booking saved to Cloud Firestore & Dispatch alert sent to ${ADMIN_EMAIL}!`, "success");
+      await setDoc(doc(db, mailPath, mailId), emailPayload);
+      showToast(`✓ Booking for "${newBooking.clientName}" locked and timeline updated!`, "success");
     } catch (err) {
       handleFirestoreError(err, OperationType.WRITE, bookingsPath);
     }
@@ -344,8 +360,19 @@ export default function App() {
     }
   };
 
-  const handleSendEmailLog = (log: EmailLog) => {
+  const handleSendEmailLog = async (log: EmailLog) => {
     setEmailLogs(current => [log, ...current]);
+    try {
+      await setDoc(doc(db, "mail", log.id), {
+        to: log.recipient,
+        subject: log.subject,
+        body: log.body,
+        status: log.status,
+        createdAt: log.timestamp
+      });
+    } catch (err) {
+      console.warn("Mail write error:", err);
+    }
     showToast(`📬 Dispatch alert delivered to ${log.recipient}`, "success");
   };
 
@@ -371,12 +398,15 @@ export default function App() {
         </div>
       )}
 
-      {/* TOP MASTER LEVEL TELEMETRY HEADER */}
+      {/* TOP MASTER LEVEL HEADER (Supervisor tab removed; centered big bold italic capital cursive brand title) */}
       <header className="sticky top-0 z-40 bg-black/45 backdrop-filter backdrop-blur-md border-b border-white/5 px-4 md:px-8 py-5 pointer-events-auto">
         <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           
-          {/* Spacer to balance center alignment on desktop */}
-          <div className="hidden md:block w-48 shrink-0" aria-hidden="true" />
+          {/* Left subtle indicator */}
+          <div className="hidden md:flex items-center gap-2 text-xs font-mono text-gray-400 w-48 shrink-0">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+            <span className="text-[11px] text-gray-300">Live Studio Engine</span>
+          </div>
 
           {/* Centered Large Bold Italic Capital Cursive Brand Title */}
           <div className="text-center flex-1 flex flex-col items-center justify-center">
@@ -388,30 +418,30 @@ export default function App() {
             </p>
           </div>
 
-          {/* Supervisor Profile & Email Alerts Controls */}
-          <div className="flex items-center gap-2.5 flex-wrap justify-center md:justify-end text-xs font-mono w-full md:w-48 shrink-0">
-            {/* Owner Profile Indicator */}
-            <div className="bg-[#121212]/80 border border-white/5 py-1.5 px-3 rounded-lg flex items-center gap-2 text-left">
-              <div className="h-1.5 w-1.5 bg-emerald-500 rounded-full animate-pulse" />
-              <div>
-                <span className="text-gray-400 text-[9px] block leading-none">Supervisor</span>
-                <span className="text-white font-extrabold text-[10px] truncate block max-w-32 mt-0.5">
-                  {supervisorEmail}
-                </span>
-              </div>
+          {/* Right Live Clock & Dispatch shortcut */}
+          <div className="flex items-center gap-2.5 justify-center md:justify-end text-xs font-mono w-full md:w-48 shrink-0">
+            <div className="bg-[#121212]/80 border border-white/10 py-1.5 px-3 rounded-xl flex items-center gap-2 text-left">
+              <Clock className="h-3.5 w-3.5 text-purple-400" />
+              <span className="text-white font-mono text-xs font-bold">{currentTime || "Live"}</span>
             </div>
 
-            {/* Email Alerts Trigger Drawer Button */}
             <button
-              onClick={() => setIsLogsOpen(!isLogsOpen)}
-              className="bg-[#1C1C24]/90 hover:bg-purple-950/20 border border-purple-500/25 text-purple-300 hover:text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 cursor-pointer font-bold transition-all duration-300"
-              title="Open Email Dispatch Telemetry Log"
+              onClick={() => setActiveTab("timeline")}
+              className={`border px-3 py-1.5 rounded-xl flex items-center gap-1.5 cursor-pointer font-bold transition-all duration-300 ${
+                activeTab === "timeline"
+                  ? "bg-purple-600 border-purple-500 text-white shadow-md shadow-purple-600/30"
+                  : "bg-[#1C1C24]/90 hover:bg-purple-950/20 border-purple-500/25 text-purple-300 hover:text-white"
+              }`}
+              title="Go to Log Timeline"
             >
               <Mail className="h-3.5 w-3.5" />
-              <span>Alerts</span>
-              ({emailLogs.length})
+              <span>Timeline</span>
+              <span className="text-[10px] bg-purple-500/20 px-1.5 py-0.2 rounded-full font-mono">
+                {emailLogs.length}
+              </span>
             </button>
           </div>
+
         </div>
       </header>
 
@@ -419,8 +449,8 @@ export default function App() {
       <main className="max-w-7xl mx-auto px-4 md:px-8 pt-8 space-y-8 relative z-10">
         
         {/* BRAND PROMOTIONS ACCENT */}
-        <div className="glass-panel p-6 rounded-3xl relative overflow-hidden pointer-events-auto">
-          <div className="absolute top-0 right-0 w-80 h-40 bg-purple-600/10 rounded-full blur-3xl" />
+        <div className="glass-panel p-6 rounded-3xl relative overflow-hidden pointer-events-auto transition-all duration-300">
+          <div className="absolute top-0 right-0 w-80 h-40 bg-purple-600/10 rounded-full blur-3xl pointer-events-none" />
           
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
             <div>
@@ -443,20 +473,20 @@ export default function App() {
                 </span>
               </div>
               <div className="pl-4">
-                <span className="text-[10px] text-gray-500 uppercase tracking-wider block">Maintenance Items</span>
+                <span className="text-[10px] text-gray-500 uppercase tracking-wider block">Dispatched Alerts</span>
                 <span className="text-xl font-bold font-mono text-pink-400">
-                  {notes.filter(n => n.category === "urgent").length} Critical Task{notes.filter(n => n.category === "urgent").length !== 1 && "s"}
+                  {emailLogs.length} Logs
                 </span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* INTERACTIVE COMPONENT NAVIGATION TAB HEADER */}
-        <div className="flex items-center bg-black/40 p-1.5 rounded-2xl border border-white/5 max-w-3xl pointer-events-auto">
+        {/* INTERACTIVE NAVIGATION TABS: Command Center, Live Schedule, Revenue, Log Timeline, Scratchpad */}
+        <div className="flex items-center bg-black/40 p-1.5 rounded-2xl border border-white/5 max-w-4xl pointer-events-auto overflow-x-auto">
           <button
             onClick={() => setActiveTab("entry")}
-            className={`flex-1 text-center font-bold text-xs uppercase py-3 rounded-xl transition duration-500 flex items-center justify-center gap-2 cursor-pointer ${
+            className={`flex-1 min-w-28 text-center font-bold text-xs uppercase py-3 rounded-xl transition duration-300 flex items-center justify-center gap-2 cursor-pointer ${
               activeTab === "entry"
                 ? "bg-gradient-to-r from-[#1E1E2E] to-purple-950/40 text-white border border-purple-500/40 shadow-inner shadow-purple-500/10"
                 : "text-gray-400 hover:text-white"
@@ -469,7 +499,7 @@ export default function App() {
 
           <button
             onClick={() => setActiveTab("schedule")}
-            className={`flex-1 text-center font-bold text-xs uppercase py-3 rounded-xl transition duration-500 flex items-center justify-center gap-2 cursor-pointer ${
+            className={`flex-1 min-w-28 text-center font-bold text-xs uppercase py-3 rounded-xl transition duration-300 flex items-center justify-center gap-2 cursor-pointer ${
               activeTab === "schedule"
                 ? "bg-gradient-to-r from-[#1E1E2E] to-purple-950/40 text-white border border-purple-500/40 shadow-inner"
                 : "text-gray-400 hover:text-white"
@@ -482,20 +512,34 @@ export default function App() {
 
           <button
             onClick={() => setActiveTab("revenue")}
-            className={`flex-1 text-center font-bold text-xs uppercase py-3 rounded-xl transition duration-500 flex items-center justify-center gap-2 cursor-pointer ${
+            className={`flex-1 min-w-28 text-center font-bold text-xs uppercase py-3 rounded-xl transition duration-300 flex items-center justify-center gap-2 cursor-pointer ${
               activeTab === "revenue"
                 ? "bg-gradient-to-r from-[#1E1E2E] to-purple-950/40 text-white border border-purple-500/40 shadow-inner"
                 : "text-gray-400 hover:text-white"
             }`}
           >
             <DollarSign className="h-4 w-4" />
-            <span className="hidden sm:inline">Financial Analytics</span>
+            <span className="hidden sm:inline">Revenue Analytics</span>
             <span className="sm:hidden">Revenue</span>
+          </button>
+
+          {/* DEDICATED LOG TIMELINE TAB */}
+          <button
+            onClick={() => setActiveTab("timeline")}
+            className={`flex-1 min-w-28 text-center font-bold text-xs uppercase py-3 rounded-xl transition duration-300 flex items-center justify-center gap-2 cursor-pointer ${
+              activeTab === "timeline"
+                ? "bg-gradient-to-r from-[#1E1E2E] to-purple-950/40 text-white border border-purple-500/40 shadow-inner"
+                : "text-gray-400 hover:text-white"
+            }`}
+          >
+            <Mail className="h-4 w-4" />
+            <span className="hidden sm:inline">Log Timeline</span>
+            <span className="sm:hidden">Logs</span>
           </button>
 
           <button
             onClick={() => setActiveTab("notes")}
-            className={`flex-1 text-center font-bold text-xs uppercase py-3 rounded-xl transition duration-500 flex items-center justify-center gap-2 cursor-pointer ${
+            className={`flex-1 min-w-28 text-center font-bold text-xs uppercase py-3 rounded-xl transition duration-300 flex items-center justify-center gap-2 cursor-pointer ${
               activeTab === "notes"
                 ? "bg-gradient-to-r from-[#1E1E2E] to-purple-950/40 text-white border border-purple-500/40 shadow-inner"
                 : "text-gray-400 hover:text-white"
@@ -514,6 +558,7 @@ export default function App() {
               onAddBooking={handleAddBooking} 
               onSendEmailLog={handleSendEmailLog}
               userEmail={supervisorEmail}
+              onNavigateTab={setActiveTab}
             />
           )}
 
@@ -533,6 +578,14 @@ export default function App() {
             />
           )}
 
+          {activeTab === "timeline" && (
+            <LogTimeline 
+              emailLogs={emailLogs}
+              onSendEmailLog={handleSendEmailLog}
+              supervisorEmail={supervisorEmail}
+            />
+          )}
+
           {activeTab === "notes" && (
             <StudioNotes 
               notes={notes}
@@ -544,80 +597,6 @@ export default function App() {
         </div>
 
       </main>
-
-      {/* DISPATCH TELEMETRY EMAIL LOGS FLOATING DRAWER */}
-      {isLogsOpen && (
-        <div className="fixed inset-y-0 right-0 w-80 md:w-96 bg-[#0E0E14] border-l border-white/10 shadow-2xl z-50 p-6 flex flex-col justify-between animate-fadeIn pointer-events-auto">
-          <div>
-            <div className="flex items-center justify-between pb-4 border-b border-white/5 mb-4">
-              <div className="flex items-center gap-2">
-                <Terminal className="h-4 w-4 text-purple-400" />
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Dispatched Alerts</h3>
-              </div>
-              <button
-                onClick={() => setIsLogsOpen(false)}
-                className="text-xs text-gray-500 hover:text-white cursor-pointer px-2 py-1 rounded bg-white/5 hover:bg-white/10"
-              >
-                Close ✕
-              </button>
-            </div>
-
-            <p className="text-[11px] text-gray-400 mb-4">
-              Real-time audit records of all confirmation notices dispatched via Cloud Firestore <code className="text-purple-300">mail</code> trigger collection to client endpoints and supervisor <span className="text-white font-mono">{ADMIN_EMAIL}</span>:
-            </p>
-
-            <div className="space-y-3.5 overflow-y-auto max-h-[80vh] pr-1">
-              {emailLogs.length === 0 ? (
-                <div className="text-xs text-gray-600 italic text-center py-6">
-                  No automated reports dispatched yet. Try logging a new booking in Command Center.
-                </div>
-              ) : (
-                emailLogs.map((log) => (
-                  <div
-                    key={log.id}
-                    className="p-3.5 rounded-lg bg-black/40 border border-[#23232a] space-y-2 text-left"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className={`text-[8px] uppercase tracking-widest font-extrabold px-1.5 py-0.5 rounded ${
-                        log.type === "confirmation" ? "bg-purple-950/20 text-purple-400" :
-                        log.type === "reminder" ? "bg-indigo-950/20 text-indigo-400" : "bg-teal-950/20 text-teal-300"
-                      }`}>
-                        {log.type}
-                      </span>
-                      <span className="text-[8px] font-mono text-gray-500">
-                        {new Date(log.timestamp).toLocaleTimeString()}
-                      </span>
-                    </div>
-
-                    <div>
-                      <span className="text-[9px] text-gray-500 block">Recipient</span>
-                      <span className="text-xs text-gray-200 truncate font-semibold block">{log.recipient}</span>
-                    </div>
-
-                    <div>
-                      <span className="text-[9px] text-gray-500 block">Subject Line</span>
-                      <span className="text-xs text-white block truncate">{log.subject}</span>
-                    </div>
-
-                    <div className="bg-[#121212]/30 p-2 rounded text-[9px] text-gray-400 font-mono whitespace-pre-wrap max-h-24 overflow-y-auto max-w-full">
-                      {log.body}
-                    </div>
-
-                    <div className="flex justify-between items-center pt-1 text-[8px] text-gray-500 font-mono">
-                      <span>Status: <strong className="text-emerald-400">● FIRESTORE DISPATCHED</strong></span>
-                      <span>Alert: {ADMIN_EMAIL.split("@")[0]}</span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-white/5 text-[9px] text-gray-600 font-mono text-center">
-            The Jam Junction • Cloud Firestore Real-Time Dispatch Console
-          </div>
-        </div>
-      )}
 
     </div>
   );
